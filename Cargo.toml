@@ -1,0 +1,21 @@
+[package]
+name = "mail-archiver"
+version = "0.1.0"
+authors = ["Jakob Dalsgaard <jakob@dalsgaard.net>"]
+
+[dependencies]
+futures = "0.1"
+tokio-core = "0.1"
+tokio-service = "0.1"
+tokio-proto = "0.1"
+tokio-signal = "0.1"
+encoding = "0.2"
+log = "0.3"
+badlog = "0.2.5"
+time = "0.1"
+service-fn = { git = "https://github.com/tokio-rs/service-fn" }
+uuid = { version = "0.2", features = ["v4"] }
+yaml-rust = "0.3.5"
+getopts = "0.2"
+libc = "0.2"
+
