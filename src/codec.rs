@@ -224,6 +224,9 @@ impl SmtpProto {
          if line.starts_with("HELO") {
            st.client_helo = line;
            Self::send_line(tx, st, "250 Ok".to_string(), Box::new(Self::wait_for_mail_from))
+         } else if line.starts_with("EHLO") {
+           st.client_helo = line;
+           Self::send_line(tx, st, "250 Ok".to_string(), Box::new(Self::wait_for_mail_from))
          } else if line.starts_with("QUIT") {
            Self::respond_to_quit(tx) 
          } else {
