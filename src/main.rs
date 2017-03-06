@@ -15,6 +15,7 @@ extern crate libc;
 extern crate log;
 extern crate badlog;
 
+use std::thread;
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::{Core, Handle};
@@ -141,6 +142,9 @@ archivers:
     // make the stream
     let usr1_stream = core.run(usr1).unwrap();
 
+    let prg_prefix = time::strftime("%H%M%S", &time::now_utc()).unwrap();
+    let connection_counter = 0u64;
+
     // combine all streams to one
     let all = socket.incoming().map(|c| Incoming::Connection(c))
              .select(usr1_stream.map(|_| Incoming::Usr1));
@@ -151,7 +155,11 @@ archivers:
       match m {
         Incoming::Connection((socket, addr)) => {
           debug!("incoming connection from {}", addr);
-          let service = service::MailArchiver {};
+          let this_prefix = format!("{}-{:06x}", &prg_prefix, &connection_counter);
+          // we need to pass this prefix to service, but service is stateless :/
+          // i.e. re-implement without the use of service!
+          let connection_counter = connection_counter + 1;
+          let service = service::MailArchiver { };
           binder.bind_server(&handle, socket, service);
           Ok(())
         },
