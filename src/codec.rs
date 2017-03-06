@@ -9,7 +9,6 @@ extern crate uuid;
 use std::io;
 use std::fs::File;
 use std::fs;
-use std::marker::Send;
 use std::io::{Write, Seek, SeekFrom};
 use tokio_core::io::{Codec, EasyBuf};
 use encoding::{Encoding, DecoderTrap, EncoderTrap};
@@ -17,7 +16,6 @@ use tokio_core::io::{Framed, Io};
 use tokio_proto::pipeline::ServerProto;
 use encoding::all::ASCII;
 use futures::{IntoFuture, Future, Sink, Stream};
-use futures::future;
 use time;
 use uuid::Uuid;
 
@@ -89,6 +87,7 @@ pub struct EmailData {
   mail_data: Vec<String>,   // mail data lines
   mail_file: Option<File>,          // mail backup file
   datetime: time::Tm,
+  prefix: String,
   archivers: Vec<config::ArchiverSetup>,
 }
 
@@ -103,7 +102,7 @@ pub fn clear_emaildata(mut md: EmailData) -> EmailData {
 }
 
 
-pub fn make_emaildata(archivers: Vec<config::ArchiverSetup>) -> EmailData {
+pub fn make_emaildata(prefix: String, archivers: Vec<config::ArchiverSetup>) -> EmailData {
   EmailData {
     client_helo: "".to_string(),
     mail_from: "".to_string(),
@@ -113,6 +112,7 @@ pub fn make_emaildata(archivers: Vec<config::ArchiverSetup>) -> EmailData {
     mail_file: None,
     datetime: time::empty_tm(),
     archivers: archivers,
+    prefix: prefix,
   }
 }
 
@@ -167,12 +167,18 @@ impl<T: Io + 'static> ServerProto<T> for SmtpProto {
 
   fn bind_transport(&self, io: T) -> Self::BindTransport {
     let transport = io.framed(ASCIILineBased);
-    let mut md = make_emaildata(self.archivers.clone());
+    let md = make_emaildata("none".to_string(), self.archivers.clone());
     Self::greet(transport, md, self.servername.clone())
   }
 }
 
 impl SmtpProto {
+
+  pub fn bind_transport<T>(&self, io: T, md: EmailData) -> <Self as ServerProto<T>>::BindTransport 
+   where T: Io + 'static {
+     let transport = io.framed(ASCIILineBased);
+     Self::greet(transport, md, self.servername.clone())
+  }
 
   pub fn new (servername: String, archivers: Vec<config::ArchiverSetup>) -> SmtpProto {
     SmtpProto { servername: servername, archivers: archivers }
@@ -186,6 +192,7 @@ impl SmtpProto {
     self.servername = servername;
   }
 
+/*
   pub fn lookup_archivepath (&mut self, recipient: String) -> Option<String> {
     for m in self.archivers.iter() {
       if m.recipient == recipient {
@@ -194,6 +201,7 @@ impl SmtpProto {
     }
     return None;
   }
+*/
 }
 
 
@@ -293,7 +301,7 @@ impl SmtpProto {
           }
         };
 
-        let mut md = clear_emaildata(st);
+        let md = clear_emaildata(st);
         Self::send_line(tx, md, "250 Ok: queued".to_string(), Box::new(Self::wait_for_mail_from))
       } else {
         if line.starts_with("Message-ID:") {
@@ -301,9 +309,9 @@ impl SmtpProto {
              None => {
                match Self::parse_messageid(&line) {
                  None => {},
-                 Some((messageid, safe)) => {
+                 Some((_messageid, safe)) => {
                    // now make a mail file
-                   let mut file = Self::make_file(&st, &safe);
+                   let file = Self::make_file(&st, &safe);
                    st.mail_file = Some(file);
                    st = Self::drain_lines(st);
                  }
@@ -344,8 +352,8 @@ impl SmtpProto {
       },
       Some(mut file) => {
         for m in md.mail_data.drain(..) {
-          file.write_all(m.as_bytes());
-          file.write_all(b"\r\n");
+          let _ = file.write_all(m.as_bytes());
+          let _ = file.write_all(b"\r\n");
         }
         md.mail_file = Some(file);
       }
@@ -359,7 +367,7 @@ impl SmtpProto {
       Ok(p) => p,
       _ => { "/tmp".to_string() }
     };
-    let filepath = format!("{}/{}.eml", tmpath, name);
+    let filepath = format!("{}/{}-{}.eml", tmpath, md.prefix, name);
     info!("Spooling mail to {}", filepath.clone());
     match File::create(filepath.clone()) {
       Ok(file) => {
@@ -367,7 +375,7 @@ impl SmtpProto {
       },
       Err(_) => {
         // perhaps dir is not created...
-        fs::create_dir_all(tmpath);
+        let _ = fs::create_dir_all(tmpath);
         // now try again before failing.
         return File::create(filepath).unwrap();
       }

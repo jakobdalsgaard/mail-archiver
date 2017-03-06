@@ -1,7 +1,7 @@
 
 use std::fs::File;
 use std::io::prelude::*;
-use yaml_rust::{Yaml, YamlLoader};
+use yaml_rust::YamlLoader;
 
 pub struct Config {
   pub listen: String,
@@ -35,7 +35,7 @@ pub fn read_config(config_file: &String) -> Result<Config, String> {
     },
   };
   let mut content = String::new();
-  let b = file.read_to_string(&mut content);
+  let _ = file.read_to_string(&mut content);
   let yaml = YamlLoader::load_from_str(&content).unwrap();
   let doc = &yaml[0];
 

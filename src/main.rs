@@ -15,7 +15,6 @@ extern crate libc;
 extern crate log;
 extern crate badlog;
 
-use std::thread;
 use futures::Future;
 use futures::stream::Stream;
 use tokio_core::reactor::{Core, Handle};
@@ -25,17 +24,12 @@ use tokio_signal::unix;
 use getopts::Options;
 use std::env;
 use std::process;
-use std::sync::Arc;
-use tokio_proto::BindServer;
-use tokio_proto::TcpServer;
-use service_fn::service_fn;
 use std::ffi::CString;
 use libc::{getpid, setgid, setuid, getgrnam, getpwnam};
 
 
 mod codec;
 mod config;
-mod service;
 
 fn print_usage(opts: Options) {
   let brief = "Usage: mail-archiver --config [YAML-CONFIG]";
@@ -143,7 +137,7 @@ archivers:
     let usr1_stream = core.run(usr1).unwrap();
 
     let prg_prefix = time::strftime("%H%M%S", &time::now_utc()).unwrap();
-    let connection_counter = 0u64;
+    let mut connection_counter = 0u64;
 
     // combine all streams to one
     let all = socket.incoming().map(|c| Incoming::Connection(c))
@@ -158,9 +152,10 @@ archivers:
           let this_prefix = format!("{}-{:06x}", &prg_prefix, &connection_counter);
           // we need to pass this prefix to service, but service is stateless :/
           // i.e. re-implement without the use of service!
-          let connection_counter = connection_counter + 1;
-          let service = service::MailArchiver { };
-          binder.bind_server(&handle, socket, service);
+          connection_counter = connection_counter + 1;
+          let md = codec::make_emaildata(this_prefix,  config.archivers.clone());
+          let fut = binder.bind_transport(socket, md);
+          handle.spawn(fut.then(|_| Ok(()))); 
           Ok(())
         },
         Incoming::Usr1 => {
