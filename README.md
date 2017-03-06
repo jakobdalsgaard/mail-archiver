@@ -32,5 +32,4 @@ Known problems, 2017-02-28:
 
 1. It does not parse "RCPT TO" email addresses, i.e. "RCPT TO" values must be exactly what is configured
    in setup yml file. 
-2. Upon client issued "QUIT" command it waits for another line of input from the client.
-3. On client dropping the connection, the application breaks.
+2. On client dropping the connection, the application breaks.

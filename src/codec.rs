@@ -215,7 +215,7 @@ impl SmtpProto {
   }
 
   fn respond_to_quit<T: Io + 'static> (tx: <Self as ServerProto<T>>::Transport) -> <Self as ServerProto<T>>::BindTransport {
-    Box::new(tx.send("221 Bye".to_string()))
+    Box::new(tx.send("221 Bye".to_string()).and_then(|_| Err(io::Error::new(io::ErrorKind::Other, "Client closed"))))
     // in tokio-core 0.2 we'll have the opportunity to signal connection shutdown
   }
 
