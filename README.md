@@ -28,8 +28,18 @@ The application has support for setgid/setuid to happen after TCP port has been 
 
 Application is totally untested. Use at your own risk.
 
-Known problems, 2017-02-28:
+Known problems, 2017-03-06:
 
-1. It does not parse "RCPT TO" email addresses, i.e. "RCPT TO" values must be exactly what is configured
-   in setup yml file. 
-2. On client dropping the connection, the application breaks.
+1. It does not parse "RCPT TO" email addresses correctly, it strips spaces and '<>' -- but does not follow the guidelines given here: https://cr.yp.to/smtp/address.html under the section 'How to read an encoded address'.
+
+Previous flaws included, but is not limited to:
+
+1. Breaks hard when client drops connection; fixed in current commit.
+2. Waits for another line of input after client has entered "QUIT"
+
+Please report if those symptoms re-merge.
+
+# Revision history:
+
+*v0.1.0* : First revision tagged; functionality is still limited, application is untested, but does not inheritedly break when chatting using telnet.
+

@@ -134,7 +134,7 @@ pub trait Chatty<T: 'static>: ServerProto<T> {
       let hs = Box::new(transport.into_future().map_err(|(e, _)| e).and_then(move |(line, tx)| {
         match line {
           Some(msg) => action(tx, msg, st),
-          None => Self::await_line(tx, st, action),
+          None => Self::map_future(Box::new(tx.into_future().map_err(|(e, _)| e).and_then(|_| Err(io::Error::new(io::ErrorKind::Other, "Got bad data"))))),
         }
       })) as Box<Future<Item = Self::Transport, Error = io::Error>>;
       Self::map_future(hs)
@@ -301,10 +301,6 @@ impl SmtpProto {
             let file = Self::make_file(&st, &uuid);
             st.mail_file = Some(file);
             st = Self::drain_lines(st);
-            match st.mail_file.some().seek(SeekFrom::Current(0)) {
-              Ok(bytes) => info!("Spooled {} bytes to file", bytes),
-              _ => info!("Spooled mail data to file"),
-            };
           }
         };
 
