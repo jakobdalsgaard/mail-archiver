@@ -283,8 +283,6 @@ impl SmtpProto {
   fn get_data<T: Io + 'static> (tx: <Self as ServerProto<T>>::Transport, md: <Self as Chatty<T>>::State) -> <Self as ServerProto<T>>::BindTransport {
     Self::await_line(tx, md, Box::new(move |tx, line, mut st| {
       if line == "." {
-        println!("Mail is done");
-
         // spool data
         // .. and close file
         st = Self::drain_lines (st);
@@ -293,11 +291,20 @@ impl SmtpProto {
             if let Ok(bytes) = file.seek(SeekFrom::Current(0)) {
               info!("Spooled {} bytes to file", bytes);
             } else {
-              info!("Spool mail data to file");
+              info!("Spooled mail data to file");
             }
           },
           None => {
-            warn!("Nothing spooled, no file created for mail");
+            // no message id found, no distinction betw headers and body
+            // spool to some uuid v4 determined filename
+            let uuid = Uuid::new_v4().hyphenated().to_string();
+            let file = Self::make_file(&st, &uuid);
+            st.mail_file = Some(file);
+            st = Self::drain_lines(st);
+            match st.mail_file.some().seek(SeekFrom::Current(0)) {
+              Ok(bytes) => info!("Spooled {} bytes to file", bytes),
+              _ => info!("Spooled mail data to file"),
+            };
           }
         };
 
@@ -321,7 +328,6 @@ impl SmtpProto {
           }
         } else
         if line == "" {  // header done, make a decision on destination file
-          println!("Set destination file");
           match st.mail_file {
             Some(_) => { // all good we're spooling i
             },
